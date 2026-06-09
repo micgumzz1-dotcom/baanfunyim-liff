@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ปฏิทินนัดหมาย | บ้านฟันยิ้ม</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    body { font-family: sans-serif; display: flex; align-items: center;
+           justify-content: center; height: 100vh; margin: 0; background: #e8f0fe; }
+    .box { text-align: center; color: #1565c0; }
+    .spin { width: 36px; height: 36px; border: 3px solid #bbdefb;
+            border-top-color: #1565c0; border-radius: 50%;
+            animation: spin .7s linear infinite; margin: 0 auto 14px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    p { font-size: 14px; margin: 0; }
+  </style>
+</head>
+<body>
+<div class="box">
+  <div class="spin"></div>
+  <p id="msg">กำลังโหลดปฏิทิน...</p>
+</div>
+<script>
+// ─── ตั้งค่า ────────────────────────────────────────────────────
+var LIFF_ID      = "YOUR_LIFF_ID_DOCTOR";        // LIFF ID จาก Provider A (หมอ)
+var GAS_VIEW_URL = "YOUR_GAS_EXEC_URL?mode=view"; // GAS exec URL
+// ───────────────────────────────────────────────────────────────
+
+function setMsg(txt, isErr) {
+  var el = document.getElementById("msg");
+  el.textContent = txt;
+  if (isErr) { el.style.color = "#c62828"; document.querySelector(".spin").style.display = "none"; }
+}
+
+liff.init({ liffId: LIFF_ID })
+  .then(function() {
+    if (!liff.isLoggedIn()) {
+      liff.login({ redirectUri: location.href });
+      return;
+    }
+    var token = liff.getIDToken();
+    if (!token) { setMsg("❌ ไม่สามารถรับ token จาก LINE", true); return; }
+    setMsg("กำลังเข้าสู่ระบบ...");
+    window.location.href = GAS_VIEW_URL + "&id_token=" + encodeURIComponent(token);
+  })
+  .catch(function(err) {
+    setMsg("❌ " + err.message, true);
+  });
+</script>
+</body>
+</html>

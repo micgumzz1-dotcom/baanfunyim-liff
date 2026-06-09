@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ปฏิทินนัดหมาย | บ้านฟันยิ้มคลินิก</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sarabun',sans-serif;background:#f0f2f5;color:#222;font-size:14px}
+button{cursor:pointer;border:none;border-radius:6px;padding:6px 12px;
+  font-size:13px;font-family:inherit}
+#app{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+#header{background:#1565c0;color:#fff;padding:8px 14px;
+  display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap}
+#header h1{font-size:16px;font-weight:700;white-space:nowrap}
+#view-badge{background:rgba(255,255,255,.2);color:#fff;font-size:11px;
+  padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap}
+#status-lbl{font-size:12px;color:#90caf9;flex:1;padding-left:6px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#header button{background:rgba(255,255,255,.15);color:#fff;padding:5px 11px;font-size:12px}
+#header button:hover{background:rgba(255,255,255,.28)}
+#orphan-bar{background:#fff3cd;color:#856404;font-size:12px;font-weight:700;
+  padding:5px 14px;flex-shrink:0;cursor:pointer;display:none}
+#orphan-bar:hover{background:#ffe69c}
+#orphan-bar.show{display:block}
+#filter-row{background:#fff;border-bottom:1px solid #ddd;
+  padding:5px 12px;display:flex;align-items:center;gap:6px;
+  flex-wrap:wrap;flex-shrink:0}
+#filter-row>span{font-size:12px;color:#555;white-space:nowrap}
+.doc-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;
+  border-radius:20px;font-size:12px;border:2px solid transparent;
+  cursor:pointer;background:#eee;color:#333;transition:.15s;user-select:none}
+.doc-chip.active{color:#fff}
+#nav-row{background:#fff;border-bottom:1px solid #ddd;
+  padding:5px 12px;display:flex;align-items:center;gap:6px;
+  flex-shrink:0;flex-wrap:wrap}
+.nav-btn{background:#1565c0;color:#fff;padding:5px 11px;font-size:12px}
+.nav-btn:hover{background:#0d47a1}
+#btn-today{background:#546e7a!important}
+#range-label{flex:1;text-align:center;font-weight:700;font-size:13px}
+#cal-wrap{flex:1;min-height:0;overflow:auto;padding:5px;
+  display:flex;align-items:stretch}
+#calendar{display:grid;grid-template-columns:repeat(7,1fr);
+  grid-template-rows:auto 1fr 1fr 1fr;
+  gap:3px;min-width:520px;flex:1;min-height:300px}
+.col-hdr{text-align:center;font-weight:700;font-size:12px;padding:3px 0;color:#546e7a}
+.col-hdr.sun{color:#c62828}.col-hdr.sat{color:#1565c0}
+.day-cell{background:#fff;border:1px solid #ddd;border-radius:5px;
+  display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.day-cell.today{border:2px solid #1565c0;background:#e8f0fe}
+.day-cell.past{opacity:.65}
+.day-hdr{display:flex;align-items:baseline;gap:3px;padding:3px 5px;
+  cursor:pointer;border-bottom:1px solid #eee;flex-shrink:0}
+.day-hdr:hover{background:#f5f5f5}
+.day-num{font-size:15px;font-weight:700}
+.day-num.sun{color:#c62828}.day-num.sat{color:#1565c0}.day-num.today-n{color:#1565c0}
+.day-mo{font-size:10px;color:#888}
+.day-evs{flex:1;min-height:0;overflow-y:auto;padding:2px 3px 3px;
+  scrollbar-width:thin;scrollbar-color:#ccc transparent}
+.day-evs::-webkit-scrollbar{width:4px}
+.day-evs::-webkit-scrollbar-thumb{background:#ccc;border-radius:2px}
+.ev-chip{border-radius:3px;padding:2px 4px;margin-bottom:2px;font-size:11px;
+  cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  display:block;transition:filter .12s}
+.ev-chip:hover{filter:brightness(.88)}
+.ev-sched{background:#f3f4f6;color:#333;border-left:3px solid #ccc;font-weight:600}
+.ev-break{background:#f3f4f6;color:#888;border-left:3px solid #bbb;
+  font-style:italic;opacity:.85}
+.ev-appt{color:#fff}
+.mback{position:fixed;inset:0;background:rgba(0,0,0,.45);
+  display:flex;align-items:center;justify-content:center;z-index:1000;padding:10px}
+.modal{background:#fff;border-radius:10px;width:100%;max-width:460px;
+  max-height:92dvh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.25)}
+.mhdr{background:#1565c0;color:#fff;padding:11px 14px;border-radius:10px 10px 0 0;
+  display:flex;align-items:center;justify-content:space-between}
+.mhdr h2{font-size:15px}
+.btn-x{background:none;color:#fff;font-size:20px;padding:0 4px;line-height:1;cursor:pointer}
+.mbody{padding:14px}
+.det-title{font-size:15px;font-weight:700;margin-bottom:8px;word-break:break-word}
+.det-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:5px;font-size:13px}
+.det-row b{min-width:68px;color:#555;flex-shrink:0}
+.det-row span{word-break:break-word}
+.status-badge{display:inline-block;padding:3px 14px;border-radius:20px;
+  font-size:12px;font-weight:700;color:#fff;margin-bottom:8px}
+.ds-ev{background:#f5f5f5;border-radius:7px;padding:9px 11px;margin-bottom:7px;
+  cursor:pointer;transition:background .1s}
+.ds-ev:hover{background:#e8f0fe}
+.ds-ev h4{font-size:13px;margin-bottom:3px}
+.ds-ev p{font-size:12px;color:#555;margin:2px 0}
+.mini-cal{border:1px solid #ddd;border-radius:6px;overflow:hidden}
+.mc-nav{display:flex;align-items:center;background:#e3f2fd;padding:5px 8px;gap:7px}
+.mc-nav span{flex:1;text-align:center;font-weight:700;font-size:13px}
+.mc-nav button{background:#1565c0;color:#fff;padding:3px 9px;font-size:12px}
+.mc-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;padding:3px;background:#fff}
+.mc-hd{text-align:center;font-size:11px;font-weight:700;color:#777;padding:2px 0}
+.mc-hd.sun{color:#c62828}.mc-hd.sat{color:#1565c0}
+.mc-day{text-align:center;padding:4px 1px;border-radius:4px;font-size:12px;cursor:pointer;transition:.1s;color:#333}
+.mc-day.empty{visibility:hidden}
+.mc-day.today{background:#aed6f1;color:#1a5276;font-weight:700}
+.mc-day:not(.empty):hover{filter:brightness(.88)}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid #ccc;
+  border-top-color:#1565c0;border-radius:50%;animation:spin .6s linear infinite;
+  vertical-align:middle;margin-right:5px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:480px){
+  .ev-chip{font-size:10px}.day-num{font-size:13px}#header h1{font-size:13px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <h1>📅 ปฏิทินนัดหมาย</h1>
+    <span id="view-badge">👁 ดูอย่างเดียว</span>
+    <span id="status-lbl"></span>
+    <button onclick="refresh()">🔄 รีเฟรช</button>
+  </div>
+  <div id="orphan-bar" onclick="openOrphanPopup()" style="display:none"></div>
+  <div id="filter-row">
+    <span>แสดงหมอ:</span>
+    <div id="filter-chips"></div>
+  </div>
+  <div id="nav-row">
+    <button class="nav-btn" onclick="shiftWeeks(-3)">◀ ก่อนหน้า</button>
+    <button class="nav-btn" onclick="shiftWeeks(3)">ถัดไป ▶</button>
+    <span id="range-label"></span>
+    <button class="nav-btn" style="background:#17a2b8" onclick="openDatePicker()">📅 ไปยังวันที่</button>
+    <button class="nav-btn" id="btn-today" onclick="goToday()">📌 วันนี้</button>
+  </div>
+  <div id="cal-wrap"><div id="calendar"></div></div>
+</div>
+
+<!-- Detail Modal -->
+<div id="m-detail" class="mback" style="display:none">
+  <div class="modal">
+    <div class="mhdr" id="det-mhdr">
+      <h2 id="det-mhdr-title">รายละเอียด</h2>
+      <button class="btn-x" onclick="closeM('m-detail')">✕</button>
+    </div>
+    <div class="mbody">
+      <div class="det-title" id="det-title"></div>
+      <div id="det-status-badge" style="display:none">
+        <span class="status-badge" id="det-status-text"></span>
+      </div>
+      <div class="det-row"><b>หมอ</b><span id="det-doc"></span></div>
+      <div class="det-row"><b>เวลา</b><span id="det-time"></span></div>
+      <div class="det-row" id="det-loc-row" style="display:none">
+        <b>สถานที่</b><span id="det-loc"></span></div>
+      <div class="det-row" id="det-desc-row" style="display:none">
+        <b>รายละเอียด</b><span id="det-desc" style="white-space:pre-wrap"></span></div>
+      <button onclick="closeM('m-detail')"
+              style="width:100%;background:#546e7a;color:#fff;padding:9px;
+                     border-radius:7px;margin-top:14px">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Day Summary Modal -->
+<div id="m-day" class="mback" style="display:none">
+  <div class="modal">
+    <div class="mhdr">
+      <h2 id="day-mtitle">สรุปวัน</h2>
+      <button class="btn-x" onclick="closeM('m-day')">✕</button>
+    </div>
+    <div class="mbody">
+      <div id="day-mbody"></div>
+      <button onclick="closeM('m-day')"
+              style="width:100%;background:#546e7a;color:#fff;padding:9px;
+                     border-radius:7px;margin-top:10px">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Orphan Popup -->
+<div id="m-orphan" class="mback" style="display:none">
+  <div class="modal">
+    <div class="mhdr" style="background:#856404">
+      <h2>⚠ นัดที่ไม่มีตารางเวรรองรับ</h2>
+      <button class="btn-x" onclick="closeM('m-orphan')">✕</button>
+    </div>
+    <div class="mbody">
+      <div id="orphan-body"></div>
+      <button onclick="closeM('m-orphan')"
+              style="width:100%;background:#546e7a;color:#fff;padding:9px;
+                     border-radius:7px;margin-top:10px">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Date Picker -->
+<div id="m-datepicker" class="mback" style="display:none">
+  <div class="modal" style="max-width:340px">
+    <div class="mhdr" style="background:#0277bd">
+      <h2>📅 ไปยังวันที่</h2>
+      <button class="btn-x" onclick="closeM('m-datepicker')">✕</button>
+    </div>
+    <div class="mbody">
+      <div class="mini-cal" id="dp-cal"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── ตั้งค่า (แก้ค่าเหล่านี้) ────────────────────────────────────
+var GAS_BASE = "YOUR_GAS_EXEC_URL"; // ← GAS exec URL ของคุณ
+
+var LIFF_IDS = {
+  "doctor": "YOUR_LIFF_ID_DOCTOR",  // ← LIFF ID จาก Provider A (หมอ)
+  "admin":  "YOUR_LIFF_ID_ADMIN"    // ← LIFF ID จาก Provider B (แอดมิน/พนักงาน)
+};
+// ────────────────────────────────────────────────────────────────
+
+// ─── อ่าน role จาก URL (?role=doctor หรือ ?role=admin) ───────
+var _role        = new URLSearchParams(window.location.search).get("role") || "";
+var ACCESS_TOKEN = sessionStorage.getItem("_bf_at") || "";
+var MY_DOC_ID    = "";
+var IS_ADMIN     = false;
+
+// ─── Constants ───────────────────────────────────────────────
+var DAYS_TH   = ["อา","จ","อ","พ","พฤ","ศ","ส"];
+var MONTHS_TH = ["","ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.",
+                 "ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+var HIDDEN_ST = {"ขอเลื่อน":1, "ยกเลิก":1};
+var STS_COLOR = {
+  "CF":"#28a745", "ติดต่อไม่ได้ 2 ครั้ง":"#fd7e14",
+  "ขอเลื่อน":"#17a2b8", "ยกเลิก":"#dc3545", "รักษาเรียบร้อย":"#6c757d"
+};
+
+// ─── State ───────────────────────────────────────────────────
+var G = {
+  dentists: [], eventsByDay: {}, filters: {},
+  viewStart: null, orphaned: [], myDocId: null
+};
+
+// ─── GAS JSON API helper ──────────────────────────────────────
+function gasApi(params) {
+  var qs = Object.keys(params).map(function(k) {
+    var v = params[k];
+    if (typeof v === "object") v = JSON.stringify(v);
+    return encodeURIComponent(k) + "=" + encodeURIComponent(String(v));
+  }).join("&");
+  qs += "&access_token=" + encodeURIComponent(ACCESS_TOKEN);
+  return fetch(GAS_BASE + "?" + qs)
+    .then(function(res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    });
+}
+
+// ─── Init ────────────────────────────────────────────────────
+window.onload = function() {
+  G.viewStart = weekStart(today());
+  if (ACCESS_TOKEN) {
+    initAuth(); // มี token ใน sessionStorage → ใช้เลย
+  } else {
+    initLiff(); // ยังไม่มี → ขอ token ผ่าน LIFF
+  }
+};
+
+// ─── LIFF Init ───────────────────────────────────────────────
+function initLiff() {
+  setStatus("กำลังเชื่อมต่อ LINE...");
+  var liffId = LIFF_IDS[_role];
+  if (!liffId || liffId.indexOf("YOUR_") === 0) {
+    setStatus("❌ ยังไม่ได้ตั้งค่า LIFF ID (role=" + (_role||"ไม่ระบุ") + ")", true);
+    return;
+  }
+  liff.init({ liffId: liffId })
+    .then(function() {
+      if (!liff.isLoggedIn()) {
+        liff.login({ redirectUri: window.location.href });
+        return;
+      }
+      var token = liff.getAccessToken();
+      if (!token) { setStatus("❌ ไม่สามารถรับ token จาก LINE", true); return; }
+      sessionStorage.setItem("_bf_at", token);
+      ACCESS_TOKEN = token;
+      initAuth();
+    })
+    .catch(function(err) { setStatus("❌ LIFF error: " + err.message, true); });
+}
+
+// ─── Auth (ส่ง token ให้ GAS ตรวจสิทธิ์) ─────────────────────
+function initAuth() {
+  setStatus("กำลังยืนยันตัวตน...");
+  gasApi({ action: "auth" })
+    .then(function(r) {
+      if (!r.success) {
+        if (r.error === "unauthorized") {
+          // Token หมดอายุ → ล้างแล้ว re-auth ผ่าน LIFF ใหม่
+          sessionStorage.removeItem("_bf_at");
+          ACCESS_TOKEN = "";
+          if (_role) { initLiff(); } else { setStatus("❌ token หมดอายุ — กรุณาเข้าใหม่ผ่าน LINE rich menu", true); }
+          return;
+        }
+        setStatus("❌ " + (r.error || "ไม่มีสิทธิ์เข้าถึง"), true);
+        return;
+      }
+      MY_DOC_ID = r.myDocId || "";
+      IS_ADMIN  = !!r.isAdmin;
+      loadDentists();
+    })
+    .catch(function(e) { setStatus("❌ auth error: " + e.message, true); });
+}
+
+function loadDentists() {
+  setStatus("กำลังโหลดข้อมูล...");
+  gasApi({ action: "dentists" })
+    .then(function(r) {
+      if (!r.success) { setStatus("❌ " + r.error, true); return; }
+      G.dentists = r.data;
+
+      if (IS_ADMIN) {
+        G.myDocId = null;
+        G.dentists.forEach(function(d) { G.filters[d.id] = false; });
+        document.getElementById("view-badge").textContent = "👁 แอดมิน";
+        buildFilterChips();
+      } else if (MY_DOC_ID) {
+        var matched = null;
+        G.dentists.forEach(function(d) { if (d.id === MY_DOC_ID) matched = d; });
+        if (matched) {
+          G.myDocId = matched.id;
+          G.dentists.forEach(function(d) { G.filters[d.id] = (d.id === G.myDocId); });
+          document.getElementById("view-badge").textContent = "👁 " + matched.nickname;
+          document.getElementById("filter-row").style.display = "none";
+        } else {
+          setStatus("❌ ไม่พบข้อมูลหมอ (docId: " + MY_DOC_ID + ")", true); return;
+        }
+      } else {
+        setStatus("❌ ไม่มีสิทธิ์เข้าถึง", true); return;
+      }
+      buildGrid();
+      fetchEvents();
+    })
+    .catch(function(e) { setStatus("❌ " + e.message, true); });
+}
+
+// ─── Status ──────────────────────────────────────────────────
+function setStatus(msg, isError) {
+  var el = document.getElementById("status-lbl");
+  el.textContent = msg || "";
+  el.style.color = isError ? "#ff8a80" : "#90caf9";
+}
+
+// ─── Navigation ──────────────────────────────────────────────
+function shiftWeeks(n) {
+  G.viewStart = new Date(G.viewStart);
+  G.viewStart.setDate(G.viewStart.getDate() + n * 7);
+  buildGrid(); fetchEvents();
+}
+function goToday() { G.viewStart = weekStart(today()); buildGrid(); fetchEvents(); }
+function refresh() { buildGrid(); fetchEvents(); }
+
+// ─── Doctor filter chips ─────────────────────────────────────
+function buildFilterChips() {
+  var el = document.getElementById("filter-chips"); el.innerHTML = "";
+  G.dentists.forEach(function(d) {
+    var chip = document.createElement("div");
+    chip.className = "doc-chip" + (G.filters[d.id] ? " active" : "");
+    chip.style.backgroundColor = G.filters[d.id] ? d.color : "#eee";
+    chip.style.borderColor = d.color;
+    chip.style.color = G.filters[d.id] ? "#fff" : "#333";
+    chip.innerHTML = '<span style="background:'+d.color+
+      ';width:8px;height:8px;border-radius:50%;display:inline-block"></span> ' + d.nickname;
+    chip.onclick = (function(doc) {
+      return function() { G.filters[doc.id] = !G.filters[doc.id]; buildFilterChips(); renderEvents(); };
+    })(d);
+    el.appendChild(chip);
+  });
+}
+
+// ─── Build calendar grid ──────────────────────────────────────
+function buildGrid() {
+  var cal = document.getElementById("calendar"); cal.innerHTML = "";
+  var end = new Date(G.viewStart); end.setDate(end.getDate() + 20);
+  document.getElementById("range-label").textContent = thaiS(G.viewStart) + " — " + thaiS(end);
+  DAYS_TH.forEach(function(d, i) {
+    var h = document.createElement("div");
+    h.className = "col-hdr" + (i===0?" sun":"") + (i===6?" sat":"");
+    h.textContent = d; cal.appendChild(h);
+  });
+  var t0 = today();
+  for (var i = 0; i < 21; i++) {
+    var dt = new Date(G.viewStart); dt.setDate(dt.getDate() + i);
+    var dk = dateKey(dt); var dow = dt.getDay();
+    var isT = sameDay(dt, t0); var isP = dt < t0;
+    var cell = document.createElement("div");
+    cell.className = "day-cell" + (isT?" today":"") + (isP?" past":"");
+    var hdr = document.createElement("div"); hdr.className = "day-hdr";
+    hdr.onclick = (function(k) { return function() { openDaySummary(k); }; })(dk);
+    var numEl = document.createElement("span");
+    numEl.className = "day-num" + (isT?" today-n":"") + (dow===0?" sun":"") + (dow===6?" sat":"");
+    numEl.textContent = dt.getDate(); hdr.appendChild(numEl);
+    if (dt.getDate()===1 || i===0) {
+      var mo = document.createElement("span"); mo.className = "day-mo";
+      mo.textContent = MONTHS_TH[dt.getMonth()+1]; hdr.appendChild(mo);
+    }
+    cell.appendChild(hdr);
+    var evs = document.createElement("div"); evs.className = "day-evs";
+    evs.id = "ev-" + dk; cell.appendChild(evs);
+    cal.appendChild(cell);
+  }
+  renderEvents();
+}
+
+// ─── Fetch events ─────────────────────────────────────────────
+function fetchEvents() {
+  var endDate = new Date(G.viewStart); endDate.setDate(endDate.getDate() + 20);
+  setStatus("กำลังโหลดปฏิทิน...");
+  gasApi({
+    action: "events",
+    start:  G.viewStart.toISOString(),
+    end:    endDate.toISOString()
+  })
+    .then(function(r) {
+      if (!r.success) { setStatus("❌ " + r.error, true); return; }
+      G.eventsByDay = r.eventsByDay;
+      renderEvents();
+      setStatus("");
+    })
+    .catch(function(e) { setStatus("❌ " + e.message, true); });
+}
+
+// ─── Render events ────────────────────────────────────────────
+function renderEvents() {
+  G.orphaned = [];
+  for (var i = 0; i < 21; i++) {
+    var dt = new Date(G.viewStart); dt.setDate(dt.getDate() + i);
+    var dk = dateKey(dt);
+    var el = document.getElementById("ev-" + dk);
+    if (!el) continue;
+    el.innerHTML = "";
+    var evs      = G.eventsByDay[dk] || [];
+    var schedDocs = {};
+    var schedEvs  = evs.filter(function(e) { return e.is_schedule; });
+    var offEvs    = evs.filter(function(e) { return e.is_off; });
+    var breakEvs  = evs.filter(function(e) { return e.is_break; });
+    var apptEvs   = evs.filter(function(e) {
+      if (e.is_schedule || e.is_off || e.is_break) return false;
+      if (!G.filters[e.docId]) return false;
+      return !HIDDEN_ST[e.status];
+    });
+    schedEvs.forEach(function(e) { if (G.filters[e.docId]) schedDocs[e.docId] = true; });
+
+    schedEvs.forEach(function(e) {
+      if (!G.filters[e.docId]) return;
+      var chip = document.createElement("div"); chip.className = "ev-chip ev-sched";
+      chip.style.borderLeftColor = e.docColor || "#ccc";
+      var tstr = (e.time !== "ทั้งวัน") ? e.time+"-"+e.time_end : "";
+      chip.textContent = "● " + e.docNickname + (tstr ? " "+tstr : "");
+      chip.title = e.summary;
+      chip.onclick = (function(ev) { return function() { openDetail(ev); }; })(e);
+      el.appendChild(chip);
+    });
+
+    offEvs.forEach(function(e) {
+      if (!G.filters[e.docId]) return;
+      var chip = document.createElement("div"); chip.className = "ev-chip";
+      var c = e.docColor || "#546e7a";
+      chip.style.background = lighten(c, 0.90); chip.style.color = lighten(c, 0.25);
+      chip.style.borderLeft = "3px solid " + c; chip.style.fontWeight = "600";
+      chip.style.opacity = "0.85";
+      chip.textContent = "● " + e.docNickname + " ออฟ";
+      chip.onclick = (function(ev) { return function() { openDetail(ev); }; })(e);
+      el.appendChild(chip);
+    });
+
+    var areaEvs = breakEvs.filter(function(e){ return G.filters[e.docId]; })
+      .concat(apptEvs)
+      .sort(function(a,b){ return (a.time||"").localeCompare(b.time||""); });
+    areaEvs.forEach(function(e) {
+      var chip = document.createElement("div");
+      if (e.is_break) {
+        chip.className = "ev-chip ev-break";
+        chip.style.background = lighten(e.docColor||"#546e7a",0.88);
+        chip.style.color      = lighten(e.docColor||"#546e7a",0.30);
+        chip.style.borderLeft = "3px solid "+lighten(e.docColor||"#546e7a",0.55);
+        chip.textContent = e.summary;
+      } else {
+        chip.className = "ev-chip ev-appt";
+        var orphaned = !schedDocs[e.docId];
+        if (orphaned) {
+          chip.style.background = "#333"; chip.style.borderLeft = "3px solid #e65100";
+          chip.textContent = "⚠ " + e.time + " " + e.summary.replace(/^\([^)]+\)\s*/,"");
+          G.orphaned.push({ date_key:dk, ev:e });
+        } else {
+          var base = e.summary.replace(/^\([^)]+\)\s*/,"");
+          var sts = e.status || ""; var _c = e.docColor || "#546e7a";
+          if (sts === "รักษาเรียบร้อย") {
+            chip.style.backgroundColor = lighten(_c,0.62); chip.style.color = lighten(_c,0.28);
+            chip.textContent = (e.time==="ทั้งวัน"?"":e.time+" ")+"(รักษาเรียบร้อย)";
+          } else if (sts === "ไม่มาตามนัด") {
+            chip.style.backgroundColor = lighten(_c,0.72); chip.style.color = lighten(_c,0.28);
+            chip.textContent = "✗ "+(e.time==="ทั้งวัน"?"":e.time+" ")+"(ไม่มาตามนัด)";
+          } else {
+            chip.style.backgroundColor = _c;
+            chip.textContent = (e.time==="ทั้งวัน"?"":e.time+" ")+base;
+          }
+        }
+      }
+      chip.title = e.summary;
+      chip.onclick = (function(ev) { return function() { openDetail(ev); }; })(e);
+      el.appendChild(chip);
+    });
+  }
+  updateOrphanBar();
+}
+
+// ─── Orphan bar ───────────────────────────────────────────────
+function updateOrphanBar() {
+  var bar = document.getElementById("orphan-bar"); var n = G.orphaned.length;
+  if (!n) { bar.className = ""; return; }
+  bar.className = "show";
+  bar.textContent = "⚠  มีนัดหมาย " + n + " รายการที่ไม่มีตารางเวรรองรับ — คลิกเพื่อดูรายละเอียด";
+}
+
+function openOrphanPopup() {
+  var body = document.getElementById("orphan-body"); body.innerHTML = "";
+  var byDate = {};
+  G.orphaned.forEach(function(o) { if (!byDate[o.date_key]) byDate[o.date_key]=[]; byDate[o.date_key].push(o.ev); });
+  Object.keys(byDate).sort().forEach(function(dk) {
+    var h = document.createElement("div");
+    h.style.cssText = "font-weight:700;font-size:13px;color:#856404;margin:10px 0 4px";
+    h.textContent = "📅 " + thaiS(new Date(dk)); body.appendChild(h);
+    byDate[dk].forEach(function(ev) {
+      var row = document.createElement("div");
+      row.style.cssText = "background:#fff3cd;border-radius:5px;padding:7px 10px;margin-bottom:4px;font-size:12px;cursor:pointer";
+      row.textContent = "🦷 " + ev.time+"–"+ev.time_end+" | "+ev.docNickname+" | "+ev.summary;
+      row.onclick = (function(e) { return function(){ closeM("m-orphan"); openDetail(e); }; })(ev);
+      body.appendChild(row);
+    });
+  });
+  showM("m-orphan");
+}
+
+// ─── Event Detail ─────────────────────────────────────────────
+function openDetail(ev) {
+  var curStatus = ev.status || ""; var isAppt = !ev.is_schedule && !ev.is_off;
+  document.getElementById("det-mhdr").style.background =
+    ev.is_schedule ? "#37474f" : (ev.is_off ? "#b71c1c" : "#1565c0");
+  document.getElementById("det-mhdr-title").textContent =
+    ev.is_schedule ? "ตารางเวร" : (ev.is_off ? "วันออฟ" : "รายละเอียดนัดหมาย");
+  document.getElementById("det-title").textContent = ev.summary;
+  var badge = document.getElementById("det-status-badge");
+  var badgeTxt = document.getElementById("det-status-text");
+  if (isAppt && curStatus) {
+    badge.style.display = ""; badgeTxt.textContent = curStatus;
+    badgeTxt.style.background = STS_COLOR[curStatus] || "#546e7a";
+  } else { badge.style.display = "none"; }
+  document.getElementById("det-doc").textContent = ev.docNickname + (ev.docId ? " ("+ev.docId+")" : "");
+  document.getElementById("det-time").textContent = ev.time==="ทั้งวัน" ? "ทั้งวัน" : ev.time+" — "+ev.time_end;
+  var locR = document.getElementById("det-loc-row"); var descR = document.getElementById("det-desc-row");
+  locR.style.display = ev.location ? "" : "none"; descR.style.display = ev.description ? "" : "none";
+  document.getElementById("det-loc").textContent  = ev.location    || "";
+  document.getElementById("det-desc").textContent = ev.description || "";
+  showM("m-detail");
+}
+
+// ─── Day Summary ──────────────────────────────────────────────
+function openDaySummary(dk) {
+  document.getElementById("day-mtitle").textContent = "📅 " + thaiS(new Date(dk));
+  var body = document.getElementById("day-mbody"); body.innerHTML = "";
+  var evs = G.eventsByDay[dk] || [];
+  var schedEvs = evs.filter(function(e){ return e.is_schedule; });
+  var offEvs   = evs.filter(function(e){ return e.is_off; });
+  var allAppts = evs.filter(function(e){
+    if (e.is_schedule||e.is_off||e.is_break) return false;
+    return !HIDDEN_ST[e.status];
+  });
+  var workDocs=[], seenIds={};
+  evs.forEach(function(e){
+    if (!seenIds[e.docId] && (e.is_schedule||(!e.is_off&&!e.is_schedule))){
+      seenIds[e.docId]=true; workDocs.push({id:e.docId,nickname:e.docNickname,color:e.docColor||"#546e7a"});
+    }
+  });
+  var selDocIds={};
+  workDocs.forEach(function(d){ selDocIds[d.id]=true; });
+
+  var dh = document.createElement("div");
+  dh.style.cssText = "font-weight:700;font-size:12px;color:#546e7a;margin-bottom:5px";
+  dh.textContent = "👨‍⚕️ หมอที่มาวันนี้"; body.appendChild(dh);
+  var chipWrap = document.createElement("div");
+  chipWrap.style.cssText = "display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px"; body.appendChild(chipWrap);
+  var divider = document.createElement("hr");
+  divider.style.cssText = "border:none;border-top:1px solid #eee;margin:6px 0"; body.appendChild(divider);
+  var apptHdr = document.createElement("div");
+  apptHdr.style.cssText = "font-weight:700;font-size:13px;color:#2e7d32;margin-bottom:6px"; body.appendChild(apptHdr);
+  var apptContainer = document.createElement("div"); body.appendChild(apptContainer);
+
+  function renderAppts() {
+    var anySelected = workDocs.some(function(d){ return selDocIds[d.id]; });
+    var filtered = allAppts.filter(function(e){ return !anySelected || !!selDocIds[e.docId]; });
+    apptHdr.textContent = "📋 นัดหมาย (" + (anySelected&&filtered.length<allAppts.length ? filtered.length+"/"+allAppts.length : filtered.length) + " รายการ)";
+    apptContainer.innerHTML = "";
+    if (!filtered.length) {
+      var empty = document.createElement("p");
+      empty.style.cssText = "color:#888;font-size:12px;padding:8px";
+      empty.textContent = allAppts.length ? "(ไม่มีนัดของหมอที่เลือก)" : "(ไม่มีนัดหมายในวันนี้)";
+      apptContainer.appendChild(empty); return;
+    }
+    filtered.forEach(function(e) {
+      var _c=e.docColor||"#546e7a", _bg=lighten(_c,0.88), _bgH=lighten(_c,0.75);
+      var card = document.createElement("div");
+      card.style.cssText = "background:"+_bg+";border-left:4px solid "+_c+";border-radius:7px;padding:9px 11px;margin-bottom:7px;cursor:pointer;transition:background .1s";
+      var docD = document.createElement("div");
+      docD.style.cssText = "font-size:10px;font-weight:700;color:"+_c+";margin-bottom:2px";
+      docD.textContent = "● "+e.docNickname;
+      var timeD = document.createElement("div");
+      timeD.style.cssText = "font-size:11px;font-weight:700;color:"+_c+";margin-bottom:3px";
+      timeD.textContent = e.time==="ทั้งวัน"?"ทั้งวัน":e.time+(e.time_end&&e.time_end!==e.time?" – "+e.time_end:"");
+      var sumD = document.createElement("div");
+      sumD.style.cssText = "font-size:13px;font-weight:600;word-break:break-word";
+      sumD.textContent = e.summary;
+      card.appendChild(docD); card.appendChild(timeD); card.appendChild(sumD);
+      if (e.description) {
+        var descD = document.createElement("div");
+        descD.style.cssText = "font-size:11px;color:#555;white-space:pre-wrap;word-break:break-word;margin-top:3px";
+        descD.textContent = e.description; card.appendChild(descD);
+      }
+      card.onmouseenter = (function(h){ return function(){ card.style.background=h; }; })(_bgH);
+      card.onmouseleave = (function(b){ return function(){ card.style.background=b; }; })(_bg);
+      card.onclick = (function(ev){ return function(){ closeM("m-day"); openDetail(ev); }; })(e);
+      apptContainer.appendChild(card);
+    });
+  }
+
+  function renderDocChips() {
+    chipWrap.innerHTML = "";
+    if (!workDocs.length && !offEvs.length) {
+      var none = document.createElement("span");
+      none.style.cssText = "font-size:12px;color:#888";
+      none.textContent = "(ไม่มีข้อมูลตารางเวร)"; chipWrap.appendChild(none); return;
+    }
+    workDocs.forEach(function(d) {
+      var active = !!selDocIds[d.id]; var chip = document.createElement("span");
+      chip.style.cssText = "display:inline-flex;align-items:center;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid "+d.color+";user-select:none;transition:.12s;"+(active?"background:"+d.color+";color:#fff":"background:#fff;color:"+d.color);
+      chip.textContent = "● " + d.nickname;
+      chip.onclick = (function(docId){ return function(){ selDocIds[docId]=!selDocIds[docId]; renderDocChips(); renderAppts(); }; })(d.id);
+      chipWrap.appendChild(chip);
+    });
+    offEvs.forEach(function(e){
+      var chip = document.createElement("span");
+      chip.style.cssText = "display:inline-flex;align-items:center;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;background:#fde8e8;color:#c62828;border:2px solid #c62828;opacity:.75";
+      chip.textContent = "● "+e.docNickname+" ออฟ"; chipWrap.appendChild(chip);
+    });
+  }
+  renderDocChips(); renderAppts(); showM("m-day");
+}
+
+// ─── Date Picker ──────────────────────────────────────────────
+var _dpMonth = [0,0];
+function openDatePicker() {
+  var t = G.viewStart || today();
+  _dpMonth = [t.getFullYear(), t.getMonth()+1];
+  renderDatePicker(); showM("m-datepicker");
+}
+function renderDatePicker() {
+  var y=_dpMonth[0], m=_dpMonth[1];
+  var el = document.getElementById("dp-cal"); el.innerHTML = "";
+  var nav = document.createElement("div"); nav.className = "mc-nav";
+  nav.innerHTML = '<button onclick="_dpPrev()">◀</button><span>'+MONTHS_TH[m]+"  "+(y+543)+'</span><button onclick="_dpNext()">▶</button>';
+  el.appendChild(nav);
+  var grid = document.createElement("div"); grid.className = "mc-grid";
+  DAYS_TH.forEach(function(d,i){
+    var hd=document.createElement("div");
+    hd.className="mc-hd"+(i===0?" sun":"")+(i===6?" sat":"");
+    hd.textContent=d; grid.appendChild(hd);
+  });
+  var firstDay=new Date(y,m-1,1).getDay(), daysInMo=new Date(y,m,0).getDate(), t0=today();
+  for (var i=0;i<42;i++){
+    var dayNum=i-firstDay+1; var cell=document.createElement("div");
+    if (dayNum<1||dayNum>daysInMo){ cell.className="mc-day empty"; grid.appendChild(cell); continue; }
+    var dt=new Date(y,m-1,dayNum);
+    cell.className="mc-day"+(sameDay(dt,t0)?" today":"");
+    cell.textContent=dayNum;
+    cell.onclick=(function(d_){ return function(){ G.viewStart=weekStart(d_); buildGrid(); fetchEvents(); closeM("m-datepicker"); }; })(dt);
+    grid.appendChild(cell);
+  }
+  el.appendChild(grid);
+}
+function _dpPrev(){ var y=_dpMonth[0],m=_dpMonth[1]; m--; if(m<1){m=12;y--;} _dpMonth=[y,m]; renderDatePicker(); }
+function _dpNext(){ var y=_dpMonth[0],m=_dpMonth[1]; m++; if(m>12){m=1;y++;} _dpMonth=[y,m]; renderDatePicker(); }
+
+// ─── Modal helpers ────────────────────────────────────────────
+function showM(id){ document.getElementById(id).style.display="flex"; }
+function closeM(id){ document.getElementById(id).style.display="none"; }
+document.querySelectorAll(".mback").forEach(function(el){
+  el.addEventListener("click", function(e){ if(e.target===el) el.style.display="none"; });
+});
+
+// ─── Helpers ─────────────────────────────────────────────────
+function today(){ var d=new Date(); d.setHours(0,0,0,0); return d; }
+function weekStart(dt){ var d=new Date(dt); d.setDate(d.getDate()-d.getDay()); d.setHours(0,0,0,0); return d; }
+function dateKey(dt){ return dt.getFullYear()+"-"+pad(dt.getMonth()+1)+"-"+pad(dt.getDate()); }
+function thaiS(dt){ var d=new Date(dt); return d.getDate()+" "+MONTHS_TH[d.getMonth()+1]+" "+(d.getFullYear()+543); }
+function pad(n){ return n<10?"0"+n:""+n; }
+function sameDay(a,b){ return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
+function lighten(hex,f){
+  if(!hex||typeof hex!=="string"||hex.length<4) hex="#546e7a";
+  var h=hex.replace("#",""),r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
+  if(isNaN(r)||isNaN(g)||isNaN(b)) return hex;
+  return "#"+[r,g,b].map(function(v){ return pad(Math.round(v+(255-v)*f).toString(16)); }).join("");
+}
+</script>
+</body>
+</html>
